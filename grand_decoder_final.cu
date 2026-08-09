@@ -252,11 +252,6 @@ __global__ void search_errors_massively_ml(int *H, int *s, int *d_active_pos, in
             cost += d_llr[d_active_pos[combo[w]]];
         }
 
-        // empacota (custo, tid) num unico uint64: os 32 bits superiores sao
-        // a representacao em bits do float custo (ordem numerica de floats
-        // positivos == ordem inteira dos bits IEEE754), os 32 bits
-        // inferiores sao o tid. atomicMinULL_ml encontra o candidato de
-        // menor custo entre TODAS as threads, nao so a primeira a chegar.
         unsigned int cost_bits = __float_as_uint(cost);
         unsigned long long key = (((unsigned long long) cost_bits) << 32) | (unsigned int) tid;
 
@@ -479,13 +474,12 @@ static int in_rowspace(int *H_simplificada, int rows, int cols, int *piv_cols, i
 }
 
 static void compute_syndrome(int *H, int m, int n, int *e, int *s, int *weight_syndrome){
-    // fazer a multiplicação de H por e para obter o síndrome s
-    // só que em mod 2, ou seja, a soma é feita com XOR
+
     * weight_syndrome = 0;
-    for (int r = 0; r < m; r++) { // para cada linha de H
+    for (int r = 0; r < m; r++) { 
         s[r] = 0;
-        for (int c = 0; c < n; c++) { // para cada coluna de H
-            s[r] ^= (H[r * n + c] & e[c]); // XOR entre H[r][c] e e[c]
+        for (int c = 0; c < n; c++) { 
+            s[r] ^= (H[r * n + c] & e[c]); 
         }
         if (s[r] == 1) (*weight_syndrome)++;
     }
@@ -1223,7 +1217,6 @@ extern "C" int grand_decode_cc(const int *Hx, const int *Hz, int n, int m, int *
                 memcpy( syndrome, &syndromes[shot * n], n * sizeof(int) );
             }
 
-            // compute_syndrome(H, n, m, e_real, syndrome, &weight_syndrome);
             extract_positions(syndrome, n, s_pos, 1, &weight_syndrome);
             
 
@@ -1403,14 +1396,12 @@ extern "C" int grand_decode_cc(const int *Hx, const int *Hz, int n, int m, int *
     }
 
 
-
-    
 extern "C" int grand_decode_cln(int *H_dem, const int *L_dem, int n, int m, int n_logicos, int *detectors, int *logicals, int num_shots, const GrandDecoderConfig *config, GrandDecoderResult *results) {
 
         setup_nCr_table_internal();
 
         int *H = (int *) malloc(n * m * sizeof(int));
-        memcpy(H, H_dem, n * m * sizeof(int));   // FIX: H nunca era preenchida a partir de H_dem
+        memcpy(H, H_dem, n * m * sizeof(int)); 
         int *H_simplificada = (int *) malloc(n * m * sizeof(int));
 
         int *e_pos = (int *) malloc(m * sizeof(int));
@@ -1489,8 +1480,7 @@ extern "C" int grand_decode_cln(int *H_dem, const int *L_dem, int n, int m, int 
             detector = &detectors[shot * n];
             logical = &logicals[shot * n_logicos];
             
-            // compute_syndrome(H, n, m, e_real, syndrome, &weight_syndrome);
-            memcpy(syndrome, detector, n * sizeof(int));  // FIX: syndrome nunca era preenchido a partir de detector (ficava sempre a zeros)
+            memcpy(syndrome, detector, n * sizeof(int));  
             extract_positions(detector, n, detector_pos, 1, &weight_syndrome);
             
 
@@ -1557,10 +1547,6 @@ extern "C" int grand_decode_cln(int *H_dem, const int *L_dem, int n, int m, int 
 
                 extract_positions(sum_cols, m, h_active_pos, threshold, &tam);
 
-                // FIX: sem este clamp, quando tam ultrapassa max_size_active_positions nenhum dos
-                // ramos GPU/CPU abaixo e executado (a condicao falha para os dois), a iteracao e
-                // desperdicada, e o threshold so continua a descer fazendo tam crescer ainda mais -
-                // esgotando max_soma sem nunca pesquisar (found=0 espurio).
                 if (tam > config->max_size_active_positions) {
                     tam = tam_old;
                 } else {
@@ -1635,7 +1621,7 @@ extern "C" int grand_decode_cln(int *H_dem, const int *L_dem, int n, int m, int 
             }
 
             if (found) {
-                extract_positions(e_est, m, e_est_pos, 1, &found_weight);  // FIX: estava comentado -- e_est_pos ficava com lixo
+                extract_positions(e_est, m, e_est_pos, 1, &found_weight); 
 
                 for (int i = 0; i < found_weight; i++) {
                     int event_pos = e_est_pos[i];
@@ -1645,7 +1631,7 @@ extern "C" int grand_decode_cln(int *H_dem, const int *L_dem, int n, int m, int 
                     }
                 }
 
-                degenerate = 1;  // FIX: faltava esta inicializacao (grand_decode_prob_cln e grand_decode_ML_cln ja a tinham)
+                degenerate = 1; 
                 for (int j = 0; j < n_logicos; j++) {
                     logicals_in_error[j] = logical_est[j] ^ logical[j];
 
@@ -1688,7 +1674,7 @@ extern "C" int grand_decode_prob_cln(int *H_dem, const int *L_dem, int n, int m,
         setup_nCr_table_internal();
 
         int *H = (int *) malloc(n * m * sizeof(int));
-        memcpy(H, H_dem, n * m * sizeof(int));   // H_dem tem de ser copiada -- ver o bug corrigido em grand_decode_cln
+        memcpy(H, H_dem, n * m * sizeof(int));  
         int *H_simplificada = (int *) malloc(n * m * sizeof(int));
 
         int *e_pos = (int *) malloc(m * sizeof(int));
@@ -1787,10 +1773,10 @@ extern "C" int grand_decode_prob_cln(int *H_dem, const int *L_dem, int n, int m,
             int *detector = NULL;
             int *logical = NULL;
 
-            detector = &detectors[shot * n];  // FIX: detectors tem n valores por shot (um por detector/linha de H_dem), nao m
+            detector = &detectors[shot * n]; 
             logical = &logicals[shot * n_logicos];
 
-            memcpy(syndrome, detector, n * sizeof(int));  // FIX: syndrome nunca era preenchido a partir de detector (ficava sempre a zeros)
+            memcpy(syndrome, detector, n * sizeof(int)); 
             extract_positions(detector, n, detector_pos, 1, &weight_syndrome);
 
             if (weight_syndrome == 0) {
@@ -1852,10 +1838,6 @@ extern "C" int grand_decode_prob_cln(int *H_dem, const int *L_dem, int n, int m,
 
                 extract_positions(sum_cols, m, h_active_pos, threshold, &tam);
 
-                // FIX: sem este clamp, quando tam ultrapassa max_size_active_positions nenhum dos
-                // ramos GPU/CPU abaixo e executado (a condicao falha para os dois), a iteracao e
-                // desperdicada, e o threshold so continua a descer fazendo tam crescer ainda mais -
-                // esgotando max_soma sem nunca pesquisar (found=0 espurio).
                 if (tam > config->max_size_active_positions) {
                     tam = tam_old;
                 } else {
@@ -2102,10 +2084,10 @@ extern "C" int grand_decode_ML_cln(int *H_dem, const int *L_dem, int n, int m, i
             int *detector = NULL;
             int *logical = NULL;
 
-            detector = &detectors[shot * n];  // FIX: detectors tem n valores por shot (um por detector/linha de H_dem), nao m
+            detector = &detectors[shot * n]; 
             logical = &logicals[shot * n_logicos];
 
-            memcpy(syndrome, detector, n * sizeof(int));  // FIX: syndrome nunca era preenchido a partir de detector (ficava sempre a zeros)
+            memcpy(syndrome, detector, n * sizeof(int)); 
             extract_positions(detector, n, detector_pos, 1, &weight_syndrome);
 
             if (weight_syndrome == 0) {
@@ -2167,10 +2149,6 @@ extern "C" int grand_decode_ML_cln(int *H_dem, const int *L_dem, int n, int m, i
 
                 extract_positions(sum_cols, m, h_active_pos, threshold, &tam);
 
-                // FIX: sem este clamp, quando tam ultrapassa max_size_active_positions nenhum dos
-                // ramos GPU/CPU abaixo e executado (a condicao falha para os dois), a iteracao e
-                // desperdicada, e o threshold so continua a descer fazendo tam crescer ainda mais -
-                // esgotando max_soma sem nunca pesquisar (found=0 espurio).
                 if (tam > config->max_size_active_positions) {
                     tam = tam_old;
                 } else {

@@ -1,5 +1,5 @@
 import numpy as np
-from auxilary_functions import *
+from Examples.auxilary_functions import *
 
 
 H_DEM_FILE = "H_Matrix_DEM/dem_H_1_5.txt" # p = 5 x 10^-4

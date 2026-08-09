@@ -1,5 +1,5 @@
 import numpy as np
-from auxilary_functions import *
+from Examples.auxilary_functions import *
 
 HX_FILE = "H_Matrix/hx_ibm_72.txt"
 HZ_FILE = "H_Matrix/hz_ibm_72.txt"
