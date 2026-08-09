@@ -203,6 +203,53 @@ def load_library(lib_path="./libgranddecoder.so"):
 
     lib.grand_decode_prob_cc.restype = ctypes.c_int
 
+    lib.grand_decode_cln.argtypes = [
+        ctypes.POINTER(ctypes.c_int),       # H_dem
+        ctypes.POINTER(ctypes.c_int),       # L_dem
+        ctypes.c_int,                       # n (linhas de H_dem, detectors)
+        ctypes.c_int,                       # m (colunas de H_dem, eventos)
+        ctypes.c_int,                       # n_logicos
+        ctypes.POINTER(ctypes.c_int),       # detectors
+        ctypes.POINTER(ctypes.c_int),       # logicals
+        ctypes.c_int,                       # num_shots
+        ctypes.POINTER(GrandDecoderConfig), # config
+        ctypes.POINTER(GrandDecoderResult), # results
+    ]
+
+    lib.grand_decode_cln.restype = ctypes.c_int
+
+    lib.grand_decode_prob_cln.argtypes = [
+        ctypes.POINTER(ctypes.c_int),       # H_dem
+        ctypes.POINTER(ctypes.c_int),       # L_dem
+        ctypes.c_int,                       # n (linhas de H_dem, detectors)
+        ctypes.c_int,                       # m (colunas de H_dem, eventos)
+        ctypes.c_int,                       # n_logicos
+        ctypes.POINTER(ctypes.c_int),       # detectors
+        ctypes.POINTER(ctypes.c_int),       # logicals
+        ctypes.c_int,                       # num_shots
+        ctypes.POINTER(GrandDecoderConfig), # config
+        ctypes.POINTER(GrandDecoderResult), # results
+        ctypes.c_char_p                     # probability_file
+    ]
+
+    lib.grand_decode_prob_cln.restype = ctypes.c_int
+
+    lib.grand_decode_ML_cln.argtypes = [
+        ctypes.POINTER(ctypes.c_int),       # H_dem
+        ctypes.POINTER(ctypes.c_int),       # L_dem
+        ctypes.c_int,                       # n (linhas de H_dem, detectors)
+        ctypes.c_int,                       # m (colunas de H_dem, eventos)
+        ctypes.c_int,                       # n_logicos
+        ctypes.POINTER(ctypes.c_int),       # detectors
+        ctypes.POINTER(ctypes.c_int),       # logicals
+        ctypes.c_int,                       # num_shots
+        ctypes.POINTER(GrandDecoderConfig), # config
+        ctypes.POINTER(GrandDecoderResult), # results
+        ctypes.c_char_p                     # llr_file
+    ]
+
+    lib.grand_decode_ML_cln.restype = ctypes.c_int
+
     return lib
 
 def run_grand_shots_cc(lib, Hx, Hz, errors, syndromes, cfg, error_type):
@@ -269,4 +316,80 @@ def run_grand_prob_shots_cc(lib, Hx, Hz, errors, syndromes, cfg, prob_file_path,
 
 def run_grand_shots_cln(lib, H_dem, L_dem, detectors, logicals, n_logicos, cfg):
     print("Running GRAND shots for CLN...")
+
+    n_rows, n_cols = H_dem.shape  # n_rows = detectors, n_cols = eventos (m)
+
+    H_dem_flat = np.ascontiguousarray(H_dem.ravel(), dtype=np.int32)
+    L_dem_flat = np.ascontiguousarray(L_dem.ravel(), dtype=np.int32)
+
+    num_shots = detectors.shape[0]
+    detectors_flat = np.ascontiguousarray(detectors.ravel(), dtype=np.int32)
+    logicals_flat = np.ascontiguousarray(logicals.ravel(), dtype=np.int32)
+
+    results = (GrandDecoderResult * num_shots)()
+
+    rc = lib.grand_decode_cln(
+        H_dem_flat.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
+        L_dem_flat.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
+        n_rows, n_cols, n_logicos,
+        detectors_flat.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
+        logicals_flat.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
+        num_shots,
+        ctypes.byref(cfg), results,
+    )
+
+    return rc, results
     
+def run_grand_prob_shots_cln(lib, H_dem, L_dem, detectors, logicals, n_logicos, cfg, prob_file_path):
+    print("Running GRAND shots for CLN with probabilities...")
+
+    n_rows, n_cols = H_dem.shape  # n_rows = detectors, n_cols = eventos (m)
+
+    H_dem_flat = np.ascontiguousarray(H_dem.ravel(), dtype=np.int32)
+    L_dem_flat = np.ascontiguousarray(L_dem.ravel(), dtype=np.int32)
+
+    num_shots = detectors.shape[0]
+    detectors_flat = np.ascontiguousarray(detectors.ravel(), dtype=np.int32)
+    logicals_flat = np.ascontiguousarray(logicals.ravel(), dtype=np.int32)
+
+    results = (GrandDecoderResult * num_shots)()
+
+    rc = lib.grand_decode_prob_cln(
+        H_dem_flat.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
+        L_dem_flat.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
+        n_rows, n_cols, n_logicos,
+        detectors_flat.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
+        logicals_flat.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
+        num_shots,
+        ctypes.byref(cfg), results,
+        prob_file_path.encode('utf-8'),
+    )
+
+    return rc, results
+
+def run_grand_ML_shots_cln(lib, H_dem, L_dem, detectors, logicals, n_logicos, cfg, llr_file_path):
+    print("Running GRAND shots for CLN with ML (LLR)...")
+
+    n_rows, n_cols = H_dem.shape  # n_rows = detectors, n_cols = eventos (m)
+
+    H_dem_flat = np.ascontiguousarray(H_dem.ravel(), dtype=np.int32)
+    L_dem_flat = np.ascontiguousarray(L_dem.ravel(), dtype=np.int32)
+
+    num_shots = detectors.shape[0]
+    detectors_flat = np.ascontiguousarray(detectors.ravel(), dtype=np.int32)
+    logicals_flat = np.ascontiguousarray(logicals.ravel(), dtype=np.int32)
+
+    results = (GrandDecoderResult * num_shots)()
+
+    rc = lib.grand_decode_ML_cln(
+        H_dem_flat.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
+        L_dem_flat.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
+        n_rows, n_cols, n_logicos,
+        detectors_flat.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
+        logicals_flat.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
+        num_shots,
+        ctypes.byref(cfg), results,
+        llr_file_path.encode('utf-8'),
+    )
+
+    return rc, results

@@ -1,4 +1,4 @@
-#include "grand_decoder.h"
+#include "grand_decoder_final.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -970,7 +970,7 @@ extern "C" int grand_decode_prob_cc(const int *Hx, const int *Hz, int n, int m, 
         }
 
         auto t_total_1 = std::chrono::steady_clock::now();
-        while (iteration < max_soma) {
+        while (iteration < max_soma && iteration < 3) {
             int threshold = max_soma - iteration;
             iteration++;
 
@@ -1288,7 +1288,7 @@ extern "C" int grand_decode_cc(const int *Hx, const int *Hz, int n, int m, int *
             }
 
             auto t_total_1 = std::chrono::steady_clock::now();
-            while (iteration < max_soma) {
+            while (iteration < max_soma && iteration < 3) {
                 int threshold = max_soma - iteration;
                 iteration++;
 
@@ -1439,7 +1439,7 @@ extern "C" int grand_decode_cln(int *H_dem, const int *L_dem, int n, int m, int 
         cudaEvent_t t_sum_1, t_sum_2, t_search_gpu_1, t_search_gpu_2;
 
         int reset_val = -1, h_found_idx = -1, found = 0, found_weight = 0, degenerate = 0, max_soma = 0, is_regular = 0;
-        int iteration = 0, tam = 0, weight_syndrome = 0, hibrido = -2, number_of_iterations = 0, shot = 0;
+        int iteration = 0, tam = 0, tam_old = 0, weight_syndrome = 0, hibrido = -2, number_of_iterations = 0, shot = 0;
         unsigned long long total_tested_combinations = 0, total_threads = 0;
         unsigned int blocks_search;
 
@@ -1478,7 +1478,7 @@ extern "C" int grand_decode_cln(int *H_dem, const int *L_dem, int n, int m, int 
 
             memset(e_est, 0, m * sizeof(int)); memset(syndrome, 0, n * sizeof(int)); memset(result, 0, sizeof(*result)); memset(e_pos, 0, m * sizeof(int)); memset(e_est_pos, 0, m * sizeof(int)); memset(s_est, 0, n * sizeof(int));
             memset(logical_est, 0, n_logicos * sizeof(int)); memset(logicals_in_error, 0, n_logicos * sizeof(int)); 
-            found = 0, found_weight = 0, degenerate = 0, iteration = 0, tam = 0, weight_syndrome = 0, hibrido = -2, number_of_iterations = 0;
+            found = 0, found_weight = 0, degenerate = 0, iteration = 0, tam = 0, tam_old = 0, weight_syndrome = 0, hibrido = -2, number_of_iterations = 0;
             total_tested_combinations = 0, total_threads = 0, blocks_search = 0;
             time_sum_ms = 0.0, total_time_search_ms = 0.0, transfer_time_ms = 0.0, total_to_find_ms = 0.0, time_search_ms = 0.0;
             time_sum_ms_f = 0.0f, time_search_ms_f = 0.0f;
@@ -1486,10 +1486,11 @@ extern "C" int grand_decode_cln(int *H_dem, const int *L_dem, int n, int m, int 
             int *detector = NULL;
             int *logical = NULL;
 
-            detector = &detectors[shot * m];
+            detector = &detectors[shot * n];
             logical = &logicals[shot * n_logicos];
             
             // compute_syndrome(H, n, m, e_real, syndrome, &weight_syndrome);
+            memcpy(syndrome, detector, n * sizeof(int));  // FIX: syndrome nunca era preenchido a partir de detector (ficava sempre a zeros)
             extract_positions(detector, n, detector_pos, 1, &weight_syndrome);
             
 
@@ -1548,13 +1549,23 @@ extern "C" int grand_decode_cln(int *H_dem, const int *L_dem, int n, int m, int 
             }
 
             auto t_total_1 = std::chrono::steady_clock::now();
-            while (iteration < max_soma) {
+            while (iteration < max_soma && iteration < 3) {
                 int threshold = max_soma - iteration;
                 iteration++;
 
                 h_found_idx = -1; found = 0;
 
                 extract_positions(sum_cols, m, h_active_pos, threshold, &tam);
+
+                // FIX: sem este clamp, quando tam ultrapassa max_size_active_positions nenhum dos
+                // ramos GPU/CPU abaixo e executado (a condicao falha para os dois), a iteracao e
+                // desperdicada, e o threshold so continua a descer fazendo tam crescer ainda mais -
+                // esgotando max_soma sem nunca pesquisar (found=0 espurio).
+                if (tam > config->max_size_active_positions) {
+                    tam = tam_old;
+                } else {
+                    tam_old = tam;
+                }
 
                 if (tam <= 0) {
                     continue;
@@ -1634,6 +1645,7 @@ extern "C" int grand_decode_cln(int *H_dem, const int *L_dem, int n, int m, int 
                     }
                 }
 
+                degenerate = 1;  // FIX: faltava esta inicializacao (grand_decode_prob_cln e grand_decode_ML_cln ja a tinham)
                 for (int j = 0; j < n_logicos; j++) {
                     logicals_in_error[j] = logical_est[j] ^ logical[j];
 
@@ -1707,7 +1719,7 @@ extern "C" int grand_decode_prob_cln(int *H_dem, const int *L_dem, int n, int m,
         PhaseOrderMask masks[GRAND_MAX_MASKS];
 
         int num_masks = 0, reset_val = -1, h_found_idx = -1, found = 0, found_weight = 0, degenerate = 0, max_soma = 0, is_regular = 0;
-        int iteration = 0, tam = 0, weight_syndrome = 0, hibrido = -2, number_of_iterations = 0, shot = 0, num_phases = 0;
+        int iteration = 0, tam = 0, tam_old = 0, weight_syndrome = 0, hibrido = -2, number_of_iterations = 0, shot = 0, num_phases = 0;
         unsigned long long total_tested_combinations = 0;
 
         double time_sum_ms = 0.0, total_time_search_ms = 0.0, transfer_time_ms = 0.0, total_to_find_ms = 0.0;
@@ -1767,7 +1779,7 @@ extern "C" int grand_decode_prob_cln(int *H_dem, const int *L_dem, int n, int m,
 
             memset(e_est, 0, m * sizeof(int)); memset(syndrome, 0, n * sizeof(int)); memset(result, 0, sizeof(*result)); memset(e_pos, 0, m * sizeof(int)); memset(e_est_pos, 0, m * sizeof(int)); memset(s_est, 0, n * sizeof(int));
             memset(logical_est, 0, n_logicos * sizeof(int)); memset(logicals_in_error, 0, n_logicos * sizeof(int));
-            found = 0, found_weight = 0, degenerate = 0, iteration = 0, tam = 0, weight_syndrome = 0, hibrido = -2, number_of_iterations = 0;
+            found = 0, found_weight = 0, degenerate = 0, iteration = 0, tam = 0, tam_old = 0, weight_syndrome = 0, hibrido = -2, number_of_iterations = 0;
             total_tested_combinations = 0;
             time_sum_ms = 0.0, total_time_search_ms = 0.0, transfer_time_ms = 0.0, total_to_find_ms = 0.0;
             time_sum_ms_f = 0.0f;
@@ -1775,9 +1787,10 @@ extern "C" int grand_decode_prob_cln(int *H_dem, const int *L_dem, int n, int m,
             int *detector = NULL;
             int *logical = NULL;
 
-            detector = &detectors[shot * m];
+            detector = &detectors[shot * n];  // FIX: detectors tem n valores por shot (um por detector/linha de H_dem), nao m
             logical = &logicals[shot * n_logicos];
 
+            memcpy(syndrome, detector, n * sizeof(int));  // FIX: syndrome nunca era preenchido a partir de detector (ficava sempre a zeros)
             extract_positions(detector, n, detector_pos, 1, &weight_syndrome);
 
             if (weight_syndrome == 0) {
@@ -1831,13 +1844,23 @@ extern "C" int grand_decode_prob_cln(int *H_dem, const int *L_dem, int n, int m,
             }
 
             auto t_total_1 = std::chrono::steady_clock::now();
-            while (iteration < max_soma) {
+            while (iteration < max_soma && iteration < 3) {
                 int threshold = max_soma - iteration;
                 iteration++;
 
                 h_found_idx = -1; found = 0;
 
                 extract_positions(sum_cols, m, h_active_pos, threshold, &tam);
+
+                // FIX: sem este clamp, quando tam ultrapassa max_size_active_positions nenhum dos
+                // ramos GPU/CPU abaixo e executado (a condicao falha para os dois), a iteracao e
+                // desperdicada, e o threshold so continua a descer fazendo tam crescer ainda mais -
+                // esgotando max_soma sem nunca pesquisar (found=0 espurio).
+                if (tam > config->max_size_active_positions) {
+                    tam = tam_old;
+                } else {
+                    tam_old = tam;
+                }
 
                 if (tam <= 0) {
                     continue;
@@ -2025,7 +2048,7 @@ extern "C" int grand_decode_ML_cln(int *H_dem, const int *L_dem, int n, int m, i
         cudaEvent_t t_sum_1, t_sum_2, t_search_gpu_1, t_search_gpu_2;
 
         int reset_val = -1, h_found_idx = -1, found = 0, found_weight = 0, degenerate = 0, max_soma = 0, is_regular = 0;
-        int iteration = 0, tam = 0, weight_syndrome = 0, hibrido = -2, number_of_iterations = 0, shot = 0;
+        int iteration = 0, tam = 0, tam_old = 0, weight_syndrome = 0, hibrido = -2, number_of_iterations = 0, shot = 0;
         unsigned long long total_tested_combinations = 0, total_threads = 0;
         unsigned int blocks_search;
 
@@ -2071,7 +2094,7 @@ extern "C" int grand_decode_ML_cln(int *H_dem, const int *L_dem, int n, int m, i
 
             memset(e_est, 0, m * sizeof(int)); memset(syndrome, 0, n * sizeof(int)); memset(result, 0, sizeof(*result)); memset(e_pos, 0, m * sizeof(int)); memset(e_est_pos, 0, m * sizeof(int)); memset(s_est, 0, n * sizeof(int));
             memset(logical_est, 0, n_logicos * sizeof(int)); memset(logicals_in_error, 0, n_logicos * sizeof(int));
-            found = 0, found_weight = 0, degenerate = 0, iteration = 0, tam = 0, weight_syndrome = 0, hibrido = -2, number_of_iterations = 0;
+            found = 0, found_weight = 0, degenerate = 0, iteration = 0, tam = 0, tam_old = 0, weight_syndrome = 0, hibrido = -2, number_of_iterations = 0;
             total_tested_combinations = 0, total_threads = 0, blocks_search = 0;
             time_sum_ms = 0.0, total_time_search_ms = 0.0, transfer_time_ms = 0.0, total_to_find_ms = 0.0, time_search_ms = 0.0;
             time_sum_ms_f = 0.0f, time_search_ms_f = 0.0f;
@@ -2079,9 +2102,10 @@ extern "C" int grand_decode_ML_cln(int *H_dem, const int *L_dem, int n, int m, i
             int *detector = NULL;
             int *logical = NULL;
 
-            detector = &detectors[shot * m];
+            detector = &detectors[shot * n];  // FIX: detectors tem n valores por shot (um por detector/linha de H_dem), nao m
             logical = &logicals[shot * n_logicos];
 
+            memcpy(syndrome, detector, n * sizeof(int));  // FIX: syndrome nunca era preenchido a partir de detector (ficava sempre a zeros)
             extract_positions(detector, n, detector_pos, 1, &weight_syndrome);
 
             if (weight_syndrome == 0) {
@@ -2135,13 +2159,23 @@ extern "C" int grand_decode_ML_cln(int *H_dem, const int *L_dem, int n, int m, i
             }
 
             auto t_total_1 = std::chrono::steady_clock::now();
-            while (iteration < max_soma) {
+            while (iteration < max_soma && iteration < 3) {
                 int threshold = max_soma - iteration;
                 iteration++;
 
                 h_found_idx = -1; found = 0;
 
                 extract_positions(sum_cols, m, h_active_pos, threshold, &tam);
+
+                // FIX: sem este clamp, quando tam ultrapassa max_size_active_positions nenhum dos
+                // ramos GPU/CPU abaixo e executado (a condicao falha para os dois), a iteracao e
+                // desperdicada, e o threshold so continua a descer fazendo tam crescer ainda mais -
+                // esgotando max_soma sem nunca pesquisar (found=0 espurio).
+                if (tam > config->max_size_active_positions) {
+                    tam = tam_old;
+                } else {
+                    tam_old = tam;
+                }
 
                 if (tam <= 0) {
                     continue;

@@ -2,17 +2,19 @@ import numpy as np
 from auxilary_functions import *
 
 
-H_DEM_FILE = "H_Matrix_DEM/dem_H_5_4.txt" # p = 5 x 10^-4
-L_DEM_FILE = "L_Matrix_DEM/dem_L_5_4.txt"
+H_DEM_FILE = "H_Matrix_DEM/dem_H_1_5.txt" # p = 5 x 10^-4
+L_DEM_FILE = "L_Matrix_DEM/dem_L_1_5.txt"
 
-DETECTOR_SHOTS_FILE = "Syndromes_DEM/detector_shots_5_4.txt"
-LOGICAL_SHOTS_FILE = "Syndromes_DEM/logical_shots_5_4.txt"
+DETECTOR_SHOTS_FILE = "Syndromes_DEM/detector_shots_GRAND_1_5.txt"
+LOGICAL_SHOTS_FILE = "Syndromes_DEM/logical_shots_GRAND_1_5.txt"
 
 
-OUTPUT_HYBRID_CSV = "results_hybrid_cln.csv"
+# OUTPUT_HYBRID_CSV = "results_hybrid_cln.csv"
 # OUTPUT_HYBRID_PROB_CSV = "results_hybrid_prob.csv"
+OUTPUT_ML_CSV = "results_hybrid_ml.csv"
 
 # PROB_FILE_PATH = "Probabilities/probabilities_72.txt"
+LLR_FILE_PATH = "LLR/llr_72.txt"   # ficheiro com m valores float (um por coluna/evento de H_dem)
 
 
 LIB_PATH = "./libgranddecoder.so"
@@ -46,8 +48,8 @@ if DETECTOR_SHOTS_FILE is not None:
     detectors = read_errors_or_syndromes_from_file(DETECTOR_SHOTS_FILE, n_cols=n_rows, max_shots=NUM_SHOTS)
     
 if LOGICAL_SHOTS_FILE is not None:
-    logicals = read_errors_or_syndromes_from_file(LOGICAL_SHOTS_FILE, n_cols=n_cols, max_shots=NUM_SHOTS)
-
+    logicals = read_errors_or_syndromes_from_file(LOGICAL_SHOTS_FILE, n_cols=L_dem.shape[1], max_shots=NUM_SHOTS)
+    
 
 if detectors is not None:
     num_shots = detectors.shape[0]
@@ -67,16 +69,20 @@ cfg = GrandDecoderConfig(
 
 lib = load_library(LIB_PATH)
 
-rc, results_hybrid = run_grand_shots_cln(lib=lib, H_dem=H_dem, L_dem=L_dem, detectors=detectors, logicals=logicals, n_logicos=n_logicos, cfg=cfg)
+#rc, results_hybrid = run_grand_shots_cln(lib=lib, H_dem=H_dem, L_dem=L_dem, detectors=detectors, logicals=logicals, n_logicos=n_logicos, cfg=cfg)
 
-#rc, results_hybrid_prob = run_grand_prob_shots_cln(lib=lib, Hx=Hx, Hz=Hz, errors=errors, syndromes=syndromes, cfg=cfg, prob_file_path=PROB_FILE_PATH, error_type=ERROR_TYPE)
+# rc, results_hybrid_prob = run_grand_prob_shots_cln(lib=lib, H_dem=H_dem, L_dem=L_dem, detectors=detectors, logicals=logicals, n_logicos=n_logicos, cfg=cfg, prob_file_path=PROB_FILE_PATH)
+
+rc, results_hybrid_ml = run_grand_ML_shots_cln(lib=lib, H_dem=H_dem, L_dem=L_dem, detectors=detectors, logicals=logicals, n_logicos=n_logicos, cfg=cfg, llr_file_path=LLR_FILE_PATH)
 
 if rc != 0:
     raise RuntimeError(f"Decoder failed with rc={rc}")
 
-save_results_cc_csv(OUTPUT_HYBRID_CSV, results_hybrid, num_shots=num_shots)
-#save_results_cc_csv(OUTPUT_HYBRID_PROB_CSV, results_hybrid_prob, num_shots=num_shots, using_errors=using_errors)
+# save_results_cln_csv(OUTPUT_HYBRID_CSV, results_hybrid, num_shots=num_shots, using_errors=True)
+# save_results_cc_csv(OUTPUT_HYBRID_PROB_CSV, results_hybrid_prob, num_shots=num_shots, using_errors=True)
+save_results_cc_csv(OUTPUT_ML_CSV, results_hybrid_ml, num_shots=num_shots, using_errors=True)
 
 print(f"Decoded {num_shots} shots")
-#print(f"Results saved in: {OUTPUT_HYBRID_PROB_CSV}")
-print(f"Results saved in: {OUTPUT_HYBRID_CSV}")
+# print(f"Results saved in: {OUTPUT_HYBRID_PROB_CSV}")
+# print(f"Results saved in: {OUTPUT_HYBRID_CSV}")
+print(f"Results saved in: {OUTPUT_ML_CSV}")
