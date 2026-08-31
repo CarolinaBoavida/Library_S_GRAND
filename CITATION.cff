@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "GRAND Decoder: GPU-Accelerated Decoding for Quantum Error Correction"
+authors:
+  - family-names: "Boavida"
+    given-names: "Carolina"
+    affiliation: "University of Coimbra"
+date-released: 2026-09-14
+version: "1.0.0"
+repository-code: "https://github.com/PLACEHOLDER_USERNAME/PLACEHOLDER_REPO"
+url: "https://github.com/PLACEHOLDER_USERNAME/PLACEHOLDER_REPO"
+license: MIT
+keywords:
+  - quantum error correction
+  - GRAND decoding
+  - CUDA
+  - GPU computing
+  - stabilizer codes
